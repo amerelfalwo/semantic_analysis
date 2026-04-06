@@ -97,7 +97,9 @@ cd /mnt/work/Ai_projects/NLP/semantic_analysis/sentiment_ui
 uv sync
 ```
 
-### 3. Running the Server
+### 3. Running the Application (Backend & Frontend)
+
+Because this is a full-stack configuration, the FastAPI backend also serves the frontend UI. You only need to run a single server command.
 
 ```bash
 uv run uvicorn main:app --host 0.0.0.0 --port 8000 --reload
@@ -105,9 +107,9 @@ uv run uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
 > On first startup, the model will automatically train and cache to `model_cache_v2.pkl`. Subsequent starts load the cache instantly.
 
-### 4. Open the App
+### 4. Open the App (Frontend)
 
-Navigate to **[http://localhost:8000](http://localhost:8000)** in your browser.
+Navigate to **[http://localhost:8000](http://localhost:8000)** in your browser to access the frontend UI.
 
 ---
 
