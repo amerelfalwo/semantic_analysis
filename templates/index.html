@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SentimentAI · Restaurant Review Analyzer</title>
+  <meta name="description" content="Analyze restaurant reviews with AI-powered NLP sentiment analysis. Powered by an Ensemble (Logistic Regression + SVM + Naive Bayes) with TF-IDF." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    /* ── Reset & Base ─────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0c0e14;
+      --surface:   #13151f;
+      --card:      #1a1d2a;
+      --border:    #252836;
+      --accent:    #7c3aed;
+      --accent2:   #a855f7;
+      --pos:       #10b981;
+      --neg:       #f43f5e;
+      --text:      #f1f5f9;
+      --muted:     #94a3b8;
+      --radius:    16px;
+      --shadow:    0 8px 40px rgba(0,0,0,.55);
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', system-ui, sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+      line-height: 1.6;
+    }
+
+    /* ── Background atmosphere ────────────────────────────── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 80% 50% at 20% 5%,  rgba(124,58,237,.20) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 40% at 80% 90%, rgba(168,85,247,.15) 0%, transparent 55%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── Layout ───────────────────────────────────────────── */
+    .wrapper { position: relative; z-index: 1; max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+
+    /* ── Nav ──────────────────────────────────────────────── */
+    nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 0;
+      border-bottom: 1px solid rgba(255,255,255,.06);
+      margin-bottom: 48px;
+    }
+    .logo {
+      display: flex; align-items: center; gap: 10px;
+      font-family: 'Outfit', sans-serif;
+      font-size: 1.4rem; font-weight: 800;
+      background: linear-gradient(135deg, #a855f7, #7c3aed);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .logo-icon {
+      width: 36px; height: 36px;
+      background: linear-gradient(135deg, #7c3aed, #a855f7);
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.1rem;
+      -webkit-text-fill-color: white;
+    }
+    .nav-badge {
+      font-size: .72rem; font-weight: 600; letter-spacing: .04em;
+      padding: 5px 12px;
+      background: rgba(124,58,237,.15);
+      border: 1px solid rgba(124,58,237,.35);
+      border-radius: 100px;
+      color: #a855f7;
+    }
+
+    /* ── Hero ─────────────────────────────────────────────── */
+    .hero { text-align: center; margin-bottom: 64px; }
+    .hero-tag {
+      display: inline-flex; align-items: center; gap: 8px;
+      font-size: .78rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase;
+      color: #a855f7; margin-bottom: 20px;
+    }
+    .hero-tag::before, .hero-tag::after {
+      content: ''; width: 24px; height: 1px; background: #a855f7; opacity: .5;
+    }
+    .hero h1 {
+      font-family: 'Outfit', sans-serif;
+      font-size: clamp(2.4rem, 5vw, 3.8rem);
+      font-weight: 800; line-height: 1.13;
+      margin-bottom: 18px;
+    }
+    .hero h1 span {
+      background: linear-gradient(135deg, #a855f7 20%, #f472b6 80%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .hero p { color: var(--muted); font-size: 1.1rem; max-width: 560px; margin: 0 auto 36px; }
+
+    /* ── Stats strip ──────────────────────────────────────── */
+    .stats {
+      display: flex; gap: 16px; flex-wrap: wrap; justify-content: center;
+      margin-bottom: 56px;
+    }
+    .stat-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px 24px;
+      min-width: 160px;
+      flex: 1 1 140px;
+      transition: border-color .25s, transform .25s;
+      cursor: default;
+    }
+    .stat-card:hover { border-color: rgba(124,58,237,.5); transform: translateY(-3px); }
+    .stat-val {
+      font-family: 'Outfit', sans-serif;
+      font-size: 2rem; font-weight: 800;
+      background: linear-gradient(135deg, #a855f7, #7c3aed);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .stat-label { font-size: .78rem; color: var(--muted); margin-top: 4px; font-weight: 500; }
+
+    /* ── Main columns ─────────────────────────────────────── */
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1fr 420px;
+      gap: 24px;
+      align-items: start;
+      margin-bottom: 48px;
+    }
+    @media (max-width: 900px) { .main-grid { grid-template-columns: 1fr; } }
+
+    /* ── Card ─────────────────────────────────────────────── */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px;
+    }
+    .card-title {
+      font-size: .8rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+      color: var(--muted); margin-bottom: 20px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .card-title .dot { width: 8px; height: 8px; border-radius: 50%; background: #a855f7; }
+
+    /* ── Input area ───────────────────────────────────────── */
+    textarea {
+      width: 100%;
+      min-height: 140px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      font-size: .96rem;
+      padding: 16px;
+      resize: vertical;
+      outline: none;
+      transition: border-color .2s, box-shadow .2s;
+      line-height: 1.6;
+    }
+    textarea:focus {
+      border-color: rgba(124,58,237,.6);
+      box-shadow: 0 0 0 3px rgba(124,58,237,.13);
+    }
+    textarea::placeholder { color: rgba(148,163,184,.5); }
+
+    .char-counter {
+      text-align: right; font-size: .74rem; color: var(--muted);
+      margin-top: 6px; margin-bottom: 16px;
+    }
+
+    /* Quick examples */
+    .examples {
+      display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 20px;
+    }
+    .example-chip {
+      font-size: .75rem; padding: 6px 12px;
+      background: rgba(124,58,237,.1);
+      border: 1px solid rgba(124,58,237,.25);
+      border-radius: 100px; color: #c4b5fd;
+      cursor: pointer; transition: all .2s;
+      white-space: nowrap;
+    }
+    .example-chip:hover { background: rgba(124,58,237,.25); border-color: #a855f7; }
+
+    /* Buttons */
+    .btn-row { display: flex; gap: 12px; }
+    .btn {
+      flex: 1;
+      padding: 14px 20px;
+      border-radius: 12px;
+      border: none;
+      font-family: 'Inter', sans-serif;
+      font-size: .95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all .22s;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, #7c3aed, #a855f7);
+      color: #fff;
+      box-shadow: 0 4px 20px rgba(124,58,237,.35);
+    }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(124,58,237,.45); }
+    .btn-primary:active { transform: translateY(0); }
+    .btn-primary:disabled { opacity: .5; transform: none; cursor: not-allowed; }
+    .btn-ghost {
+      background: rgba(255,255,255,.05); color: var(--muted);
+      border: 1px solid var(--border);
+    }
+    .btn-ghost:hover { background: rgba(255,255,255,.09); color: var(--text); }
+
+    /* Loading spinner */
+    .spinner {
+      width: 18px; height: 18px;
+      border: 2px solid rgba(255,255,255,.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin .6s linear infinite;
+      display: none;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Result panel ─────────────────────────────────────── */
+    #result-panel { display: none; margin-top: 24px; }
+
+    .sentiment-badge {
+      display: inline-flex; align-items: center; gap: 10px;
+      padding: 10px 20px; border-radius: 100px;
+      font-weight: 700; font-size: 1.05rem;
+      margin-bottom: 20px;
+    }
+    .badge-pos { background: rgba(16,185,129,.15); color: #10b981; border: 1px solid rgba(16,185,129,.35); }
+    .badge-neg { background: rgba(244,63,94,.15);  color: #f43f5e; border: 1px solid rgba(244,63,94,.35); }
+    .badge-icon { font-size: 1.3rem; }
+
+    /* Probability bars */
+    .prob-row { margin-bottom: 14px; }
+    .prob-label {
+      display: flex; justify-content: space-between;
+      font-size: .82rem; font-weight: 600; margin-bottom: 6px;
+    }
+    .prob-track {
+      height: 10px; background: rgba(255,255,255,.07);
+      border-radius: 100px; overflow: hidden;
+    }
+    .prob-fill {
+      height: 100%; border-radius: 100px;
+      transition: width .7s cubic-bezier(.25,.1,.25,1);
+    }
+    .fill-pos { background: linear-gradient(90deg, #10b981, #34d399); }
+    .fill-neg { background: linear-gradient(90deg, #f43f5e, #fb7185); }
+
+    /* Processed text */
+    .processed-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 16px;
+      font-size: .82rem; color: var(--muted);
+      font-family: 'Courier New', monospace;
+      line-height: 1.5; margin-top: 16px;
+      word-break: break-all;
+    }
+    .processed-box strong { color: var(--text); font-family: 'Inter', sans-serif; font-size: .78rem; display: block; margin-bottom: 6px; }
+
+    /* ── Right column ─────────────────────────────────────── */
+    .right-col { display: flex; flex-direction: column; gap: 20px; }
+
+    /* Confusion matrix */
+    .cm-grid {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 10px; margin-top: 6px;
+    }
+    .cm-cell {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 10px;
+      text-align: center;
+    }
+    .cm-val { font-family: 'Outfit', sans-serif; font-size: 1.8rem; font-weight: 800; }
+    .cm-sub { font-size: .7rem; color: var(--muted); margin-top: 2px; }
+    .cm-tp .cm-val { color: #10b981; }
+    .cm-tn .cm-val { color: #10b981; }
+    .cm-fp .cm-val { color: #f97316; }
+    .cm-fn .cm-val { color: #f43f5e; }
+
+    /* Accuracy ring */
+    .ring-wrap { display: flex; align-items: center; gap: 20px; }
+    .ring {
+      position: relative; width: 90px; height: 90px; flex-shrink: 0;
+    }
+    .ring svg { transform: rotate(-90deg); }
+    .ring-pct {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'Outfit', sans-serif; font-size: 1.1rem; font-weight: 800;
+      color: #a855f7;
+    }
+    .ring-info strong { font-size: 1rem; font-weight: 700; display: block; }
+    .ring-info span { font-size: .78rem; color: var(--muted); }
+
+    /* Sample reviews */
+    .sample-list { display: flex; flex-direction: column; gap: 10px; }
+    .sample-item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-size: .82rem;
+      display: flex; align-items: flex-start; gap: 10px;
+      cursor: pointer;
+      transition: border-color .2s, background .2s;
+    }
+    .sample-item:hover { border-color: rgba(124,58,237,.4); background: rgba(124,58,237,.07); }
+    .sample-pill {
+      font-size: .65rem; font-weight: 700; padding: 3px 8px;
+      border-radius: 100px; flex-shrink: 0; margin-top: 2px;
+    }
+    .pill-pos { background: rgba(16,185,129,.2); color: #10b981; }
+    .pill-neg { background: rgba(244,63,94,.2);  color: #f43f5e; }
+    .sample-text { color: var(--muted); line-height: 1.45; }
+
+    /* ── Retrain CTA ──────────────────────────────────────── */
+    .retrain-bar {
+      background: linear-gradient(135deg, rgba(124,58,237,.15), rgba(168,85,247,.12));
+      border: 1px solid rgba(124,58,237,.3);
+      border-radius: 14px;
+      padding: 20px 24px;
+      display: flex; align-items: center; justify-content: space-between; gap: 16px;
+      flex-wrap: wrap;
+      margin-bottom: 48px;
+    }
+    .retrain-text strong { display: block; font-size: .95rem; margin-bottom: 4px; }
+    .retrain-text span { font-size: .82rem; color: var(--muted); }
+    .btn-retrain {
+      background: linear-gradient(135deg, #7c3aed, #a855f7);
+      color: #fff; border: none; border-radius: 10px;
+      padding: 10px 18px; font-weight: 600; font-size: .88rem;
+      cursor: pointer; transition: all .2s; white-space: nowrap;
+    }
+    .btn-retrain:hover { transform: translateY(-1px); opacity: .9; }
+    .btn-retrain:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+
+    /* Toast */
+    #toast {
+      position: fixed; bottom: 28px; right: 28px;
+      padding: 14px 22px; border-radius: 12px;
+      font-size: .88rem; font-weight: 600;
+      opacity: 0; pointer-events: none;
+      transition: opacity .3s;
+      z-index: 9999;
+    }
+    #toast.show { opacity: 1; }
+    #toast.success { background: rgba(16,185,129,.9); color: #fff; }
+    #toast.error   { background: rgba(244,63,94,.9);  color: #fff; }
+
+    /* ── Footer ───────────────────────────────────────────── */
+    footer {
+      border-top: 1px solid rgba(255,255,255,.06);
+      padding: 24px 0;
+      text-align: center;
+      font-size: .78rem; color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+<div class="wrapper">
+
+  <!-- Nav -->
+  <nav>
+    <div class="logo">
+      <div class="logo-icon">🧠</div>
+      SentimentAI
+    </div>
+    <span class="nav-badge">Ensemble · TF-IDF · NLTK</span>
+  </nav>
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="hero-tag">NLP · Sentiment Analysis</div>
+    <h1>Analyze Restaurant Reviews<br><span>with Machine Learning</span></h1>
+    <p>Paste any restaurant review and our Ensemble classifier (LR + SVM + NB) will predict sentiment with probability scores.</p>
+  </section>
+
+  <!-- Stats strip -->
+  <div class="stats" id="stats-strip">
+    <div class="stat-card">
+      <div class="stat-val" id="s-accuracy">—</div>
+      <div class="stat-label">Accuracy</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val" id="s-precision">—</div>
+      <div class="stat-label">Precision</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val" id="s-recall">—</div>
+      <div class="stat-label">Recall</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val" id="s-f1">—</div>
+      <div class="stat-label">F1 Score</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val" id="s-cv">—</div>
+      <div class="stat-label">CV Accuracy (5-fold)</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val" id="s-samples">—</div>
+      <div class="stat-label">Total Reviews</div>
+    </div>
+  </div>
+
+  <!-- Main grid -->
+  <div class="main-grid">
+
+    <!-- Left: input + result -->
+    <div>
+      <div class="card">
+        <div class="card-title"><span class="dot"></span>Predict Sentiment</div>
+
+        <label style="font-size:.82rem;color:var(--muted);font-weight:500;display:block;margin-bottom:8px;">
+          Restaurant Review
+        </label>
+        <textarea id="review-input" maxlength="1000"
+          placeholder="e.g.  The food was absolutely amazing and the staff were very friendly!"></textarea>
+        <div class="char-counter"><span id="char-count">0</span> / 1000</div>
+
+        <div style="font-size:.78rem;color:var(--muted);font-weight:600;margin-bottom:6px;">Quick examples →</div>
+        <div class="examples" id="example-chips"></div>
+
+        <div class="btn-row">
+          <button class="btn btn-primary" id="analyze-btn" onclick="analyze()">
+            <span class="spinner" id="spin"></span>
+            <span id="btn-label">⚡ Analyze</span>
+          </button>
+          <button class="btn btn-ghost" onclick="clearInput()">Clear</button>
+        </div>
+
+        <!-- Result -->
+        <div id="result-panel">
+          <div style="height:1px;background:var(--border);margin:24px 0;"></div>
+
+          <div class="sentiment-badge" id="sentiment-badge"></div>
+          <div style="font-size:.82rem;color:var(--muted);margin-bottom:16px;">Confidence: <strong id="conf-val" style="color:var(--text)"></strong></div>
+
+          <div class="prob-row">
+            <div class="prob-label">
+              <span>😊 Positive</span>
+              <span id="pos-val">0%</span>
+            </div>
+            <div class="prob-track">
+              <div class="prob-fill fill-pos" id="pos-bar" style="width:0%"></div>
+            </div>
+          </div>
+          <div class="prob-row">
+            <div class="prob-label">
+              <span>😞 Negative</span>
+              <span id="neg-val">0%</span>
+            </div>
+            <div class="prob-track">
+              <div class="prob-fill fill-neg" id="neg-bar" style="width:0%"></div>
+            </div>
+          </div>
+
+          <div class="processed-box" id="processed-box">
+            <strong>🔤 Preprocessed tokens</strong>
+            <span id="processed-text"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right column -->
+    <div class="right-col">
+
+      <!-- Accuracy ring + metrics -->
+      <div class="card">
+        <div class="card-title"><span class="dot"></span>Model Performance</div>
+        <div class="ring-wrap">
+          <div class="ring">
+            <svg width="90" height="90" viewBox="0 0 90 90">
+              <circle cx="45" cy="45" r="38" fill="none" stroke="rgba(255,255,255,.06)" stroke-width="8"/>
+              <circle cx="45" cy="45" r="38" fill="none" stroke="url(#rg)" stroke-width="8"
+                stroke-linecap="round" stroke-dasharray="238.76" id="ring-dash" stroke-dashoffset="238.76"/>
+              <defs>
+                <linearGradient id="rg" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stop-color="#7c3aed"/>
+                  <stop offset="100%" stop-color="#a855f7"/>
+                </linearGradient>
+              </defs>
+            </svg>
+            <div class="ring-pct" id="ring-pct">—</div>
+          </div>
+          <div class="ring-info">
+            <strong>Test Accuracy</strong>
+            <span>Ensemble (LR+SVM+NB) · 20% hold-out</span>
+            <div style="margin-top:10px;display:flex;flex-direction:column;gap:4px;">
+              <span style="font-size:.8rem;">🎯 Precision: <strong id="prec-detail">—</strong></span>
+              <span style="font-size:.8rem;">📡 Recall: <strong id="rec-detail">—</strong></span>
+              <span style="font-size:.8rem;">📊 F1 Score: <strong id="f1-detail">—</strong></span>
+              <span style="font-size:.8rem;">🔁 CV Accuracy: <strong id="cv-detail">—</strong></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Confusion matrix -->
+        <div style="margin-top:20px;font-size:.78rem;color:var(--muted);font-weight:600;margin-bottom:8px;">Confusion Matrix</div>
+        <div class="cm-grid">
+          <div class="cm-cell cm-tp">
+            <div class="cm-val" id="cm-tp">—</div>
+            <div class="cm-sub">True Positive</div>
+          </div>
+          <div class="cm-cell cm-fp">
+            <div class="cm-val" id="cm-fp">—</div>
+            <div class="cm-sub">False Positive</div>
+          </div>
+          <div class="cm-cell cm-fn">
+            <div class="cm-val" id="cm-fn">—</div>
+            <div class="cm-sub">False Negative</div>
+          </div>
+          <div class="cm-cell cm-tn">
+            <div class="cm-val" id="cm-tn">—</div>
+            <div class="cm-sub">True Negative</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sample reviews -->
+      <div class="card">
+        <div class="card-title"><span class="dot"></span>Sample Reviews (click to test)</div>
+        <div class="sample-list" id="sample-list">
+          <div style="color:var(--muted);font-size:.82rem;">Loading samples…</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Retrain bar -->
+  <div class="retrain-bar">
+    <div class="retrain-text">
+      <strong>🔄 Retrain the Model</strong>
+      <span>Re-run the full pipeline from scratch: preprocessing → vectorization → training.</span>
+    </div>
+    <button class="btn-retrain" id="retrain-btn" onclick="retrain()">Retrain Now</button>
+  </div>
+
+</div><!-- /wrapper -->
+
+<div id="toast"></div>
+
+<footer>
+  <div class="wrapper">
+    Built with FastAPI · scikit-learn · NLTK · Restaurant_Reviews dataset
+  </div>
+</footer>
+
+<script>
+  const EXAMPLES = [
+    "Wow! Loved this place, the food was absolutely incredible.",
+    "Crust is not good at all, very disappointing.",
+    "The service was excellent and the pasta was divine.",
+    "Overpriced and the portions are tiny. Never coming back.",
+    "A hidden gem! Best tacos I've ever had.",
+    "Rude staff and cold food. Terrible experience.",
+  ];
+
+  /* ── Init ─────────────────────────────────────── */
+  window.addEventListener('DOMContentLoaded', async () => {
+    buildExampleChips();
+    await loadMetrics();
+    await loadSamples();
+  });
+
+  function buildExampleChips() {
+    const c = document.getElementById('example-chips');
+    EXAMPLES.forEach(ex => {
+      const ch = document.createElement('button');
+      ch.className = 'example-chip';
+      ch.textContent = ex.length > 40 ? ex.slice(0, 38) + '…' : ex;
+      ch.onclick = () => {
+        document.getElementById('review-input').value = ex;
+        updateCharCount(ex.length);
+      };
+      c.appendChild(ch);
+    });
+  }
+
+  /* ── Char counter ─────────────────────────────── */
+  document.getElementById('review-input').addEventListener('input', e => updateCharCount(e.target.value.length));
+  function updateCharCount(n) { document.getElementById('char-count').textContent = n; }
+
+  /* ── Load metrics ─────────────────────────────── */
+  async function loadMetrics() {
+    try {
+      const r = await fetch('/api/metrics');
+      const m = await r.json();
+      applyMetrics(m);
+    } catch(e) { /* ignore */ }
+  }
+
+  function applyMetrics(m) {
+    animateNum('s-accuracy',  m.accuracy,  '%');
+    animateNum('s-precision', m.precision, '%');
+    animateNum('s-recall',    m.recall,    '%');
+    animateNum('s-f1',        m.f1,        '%');
+    if (m.cv_accuracy) {
+      document.getElementById('s-cv').textContent = m.cv_accuracy + '% ±' + m.cv_std + '%';
+    }
+    document.getElementById('s-samples').textContent = m.total_samples;
+
+    // ring
+    const dash = 238.76;
+    const offset = dash - (m.accuracy / 100) * dash;
+    const ring = document.getElementById('ring-dash');
+    requestAnimationFrame(() => {
+      ring.style.transition = 'stroke-dashoffset 1.2s cubic-bezier(.25,.1,.25,1)';
+      ring.style.strokeDashoffset = offset;
+    });
+    document.getElementById('ring-pct').textContent    = m.accuracy + '%';
+    document.getElementById('prec-detail').textContent = m.precision + '%';
+    document.getElementById('rec-detail').textContent  = m.recall + '%';
+    document.getElementById('f1-detail').textContent   = m.f1 + '%';
+    if (m.cv_accuracy) {
+      document.getElementById('cv-detail').textContent = m.cv_accuracy + '% ±' + m.cv_std + '%';
+    }
+
+    // confusion matrix
+    const cm = m.confusion_matrix;
+    document.getElementById('cm-tp').textContent = cm.tp;
+    document.getElementById('cm-fp').textContent = cm.fp;
+    document.getElementById('cm-fn').textContent = cm.fn;
+    document.getElementById('cm-tn').textContent = cm.tn;
+  }
+
+  function animateNum(id, target, suffix='') {
+    const el = document.getElementById(id);
+    let start = 0, duration = 800;
+    const step = ts => {
+      if (!start) start = ts;
+      const p = Math.min((ts - start) / duration, 1);
+      el.textContent = (target * p).toFixed(1) + suffix;
+      if (p < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }
+
+  /* ── Load samples ─────────────────────────────── */
+  async function loadSamples() {
+    try {
+      const r = await fetch('/api/samples');
+      const samples = await r.json();
+      const list = document.getElementById('sample-list');
+      list.innerHTML = '';
+      samples.forEach(s => {
+        const item = document.createElement('div');
+        item.className = 'sample-item';
+        item.innerHTML = `
+          <span class="sample-pill ${s.label === 1 ? 'pill-pos' : 'pill-neg'}">
+            ${s.label === 1 ? '😊 Pos' : '😞 Neg'}
+          </span>
+          <span class="sample-text">${escHtml(s.text)}</span>
+        `;
+        item.onclick = () => {
+          document.getElementById('review-input').value = s.text;
+          updateCharCount(s.text.length);
+        };
+        list.appendChild(item);
+      });
+    } catch(e) { /* ignore */ }
+  }
+
+  /* ── Analyze ──────────────────────────────────── */
+  async function analyze() {
+    const text = document.getElementById('review-input').value.trim();
+    if (!text) { toast('Please enter a review first.', 'error'); return; }
+
+    const btn   = document.getElementById('analyze-btn');
+    const spin  = document.getElementById('spin');
+    const label = document.getElementById('btn-label');
+    btn.disabled = true;
+    spin.style.display = 'block';
+    label.textContent = 'Analyzing…';
+
+    try {
+      const r = await fetch('/api/predict', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      });
+      if (!r.ok) {
+        const err = await r.json();
+        throw new Error(err.detail || 'Prediction failed');
+      }
+      const d = await r.json();
+      showResult(d);
+    } catch(e) {
+      toast(e.message, 'error');
+    } finally {
+      btn.disabled = false;
+      spin.style.display = 'none';
+      label.textContent = '⚡ Analyze';
+    }
+  }
+
+  function showResult(d) {
+    const panel = document.getElementById('result-panel');
+    panel.style.display = 'block';
+    panel.style.opacity = '0';
+    requestAnimationFrame(() => {
+      panel.style.transition = 'opacity .4s';
+      panel.style.opacity = '1';
+    });
+
+    const isPos = d.sentiment === 'Positive';
+    const badge = document.getElementById('sentiment-badge');
+    badge.className = 'sentiment-badge ' + (isPos ? 'badge-pos' : 'badge-neg');
+    badge.innerHTML = `<span class="badge-icon">${isPos ? '😊' : '😞'}</span> ${d.sentiment}`;
+
+    document.getElementById('conf-val').textContent = d.confidence + '%';
+
+    // bars
+    setTimeout(() => {
+      document.getElementById('pos-val').textContent = d.positive_prob + '%';
+      document.getElementById('neg-val').textContent = d.negative_prob + '%';
+      document.getElementById('pos-bar').style.width  = d.positive_prob + '%';
+      document.getElementById('neg-bar').style.width  = d.negative_prob + '%';
+    }, 50);
+
+    document.getElementById('processed-text').textContent = d.processed_text;
+  }
+
+  /* ── Clear ────────────────────────────────────── */
+  function clearInput() {
+    document.getElementById('review-input').value = '';
+    updateCharCount(0);
+    document.getElementById('result-panel').style.display = 'none';
+  }
+
+  /* ── Retrain ──────────────────────────────────── */
+  async function retrain() {
+    const btn = document.getElementById('retrain-btn');
+    btn.disabled = true;
+    btn.textContent = '⏳ Retraining…';
+    try {
+      const r = await fetch('/api/retrain', { method: 'POST' });
+      const d = await r.json();
+      if (d.status === 'success') {
+        applyMetrics(d.metrics);
+        await loadSamples();
+        toast('Model retrained successfully! 🎉', 'success');
+      } else {
+        toast('Retraining failed.', 'error');
+      }
+    } catch(e) {
+      toast('Retraining failed: ' + e.message, 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Retrain Now';
+    }
+  }
+
+  /* ── Toast ────────────────────────────────────── */
+  function toast(msg, type = 'success') {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = `show ${type}`;
+    clearTimeout(t._tid);
+    t._tid = setTimeout(() => { t.className = ''; }, 3200);
+  }
+
+  /* ── Utils ────────────────────────────────────── */
+  function escHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  /* Enter key shortcut */
+  document.getElementById('review-input').addEventListener('keydown', e => {
+    if (e.ctrlKey && e.key === 'Enter') analyze();
+  });
+</script>
+</body>
+</html>
